@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Pomodoro iPad</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Helvetica Neue', sans-serif;
+      height: 100%;
+      overflow: hidden;
+      color: white;
+      transition: background-color 0.5s ease, color 0.5s ease;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background-color: #000;
+      background-size: cover;
+      background-position: center;
+      backdrop-filter: blur(2px);
+    }
+
+    h1 {
+      font-size: 2.2em;
+      margin: 0.3em;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
+    }
+
+    .timer {
+      font-size: 4em;
+      margin: 0.5em;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.6);
+    }
+
+    .controls, .session-count, .quote, .theme-toggle {
+      margin: 0.5em;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+    }
+
+    button, select {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid white;
+      border-radius: 10px;
+      padding: 0.8em 1.3em;
+      font-size: 1em;
+      margin: 0.3em;
+      color: white;
+      backdrop-filter: blur(2px);
+      cursor: pointer;
+    }
+
+    button:hover, select:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .quote {
+      font-style: italic;
+      font-size: 1em;
+      max-width: 90vw;
+    }
+
+    .dark {
+      background-color: #111;
+      color: white;
+    }
+
+    .light {
+      background-color: #f8f8f8;
+      color: #222;
+    }
+
+    .light button, .light select {
+      border: 1px solid #333;
+      background: rgba(0, 0, 0, 0.05);
+      color: #222;
+    }
+
+    @media screen and (max-width: 768px) {
+      .timer { font-size: 3em; }
+      h1 { font-size: 2em; }
+      .controls, .quote, .session-count { font-size: 0.9em; }
+    }
+  </style>
+</head>
+<body class="dark">
+  <h1>Session de Travail</h1>
+  <div class="timer" id="timer">00:00</div>
+
+  <div class="controls">
+    <label>Travail :
+      <select id="workDuration">
+        <option value="60">1h</option>
+        <option value="90" selected>1h30</option>
+        <option value="120">2h</option>
+      </select>
+    </label>
+
+    <label>Pause :
+      <select id="breakDuration">
+        <option value="10" selected>10 min</option>
+        <option value="15">15 min</option>
+      </select>
+    </label>
+  </div>
+
+  <button onclick="startTimer()">▶️ Démarrer</button>
+  <button onclick="pauseResumeTimer()">⏸️ Pause / Reprendre</button>
+  <button onclick="resetStats()">🔄 Réinitialiser les stats</button>
+  <button onclick="toggleTheme()">🌓 Jour / Nuit</button>
+
+  <div class="session-count" id="sessionCount">Sessions aujourd'hui : 1 | Total : 1</div>
+  <div class="quote">“Le calme est la puissance en silence.”</div>
+
+  <script>
+    // --- FONDS ALÉATOIRES ---
+    const backgrounds = ['cafe1.jpg', 'cafe2.jpg', 'cafe3.jpg', 'cafe4.jpg', 'cafe5.jpg'];
+    const randomBg = backgrounds[Math.floor(Math.random() * backgrounds.length)];
+    document.body.style.backgroundImage = `url('${randomBg}')`;
+
+    // --- VARIABLES GLOBALES ---
+    let isWork = true;
+    let timeLeft = 0;
+    let timerInterval = null;
+    let isPaused = false;
+    const timerDisplay = document.getElementById('timer');
+    const todayKey = new Date().toISOString().slice(0, 10);
+
+    let stats = JSON.parse(localStorage.getItem('pomodoroStats')) || {
+      total: 1,
+      today: 1,
+      date: todayKey
+    };
+
+    if (stats.date !== todayKey) {
+      stats.today = 0;
+      stats.date = todayKey;
+    }
+
+    updateStatDisplay();
+    updateDisplay();
+
+    function updateStatDisplay() {
+      document.getElementById('sessionCount').textContent =
+        `Sessions aujourd'hui : ${stats.today} | Total : ${stats.total}`;
+    }
+
+    function saveStats() {
+      localStorage.setItem('pomodoroStats', JSON.stringify(stats));
+    }
+
+    function updateDisplay() {
+      const m = Math.floor(timeLeft / 60);
+      const s = timeLeft % 60;
+      timerDisplay.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function startTimer() {
+      clearInterval(timerInterval);
+      const workMin = parseInt(document.getElementById('workDuration').value);
+      const breakMin = parseInt(document.getElementById('breakDuration').value);
+      timeLeft = isWork ? workMin * 60 : breakMin * 60;
+      updateDisplay();
+      isPaused = false;
+      timerInterval = setInterval(runTimer, 1000);
+    }
+
+    function runTimer() {
+      if (!isPaused) {
+        timeLeft--;
+        updateDisplay();
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          if (isWork) {
+            stats.total++;
+            stats.today++;
+            saveStats();
+            updateStatDisplay();
+            alert("Pause ! ☕");
+          } else {
+            alert("On reprend ! 💪");
+          }
+          isWork = !isWork;
+          startTimer();
+        }
+      }
+    }
+
+    function pauseResumeTimer() {
+      isPaused = !isPaused;
+    }
+
+    function resetStats() {
+      if (confirm("Réinitialiser toutes les statistiques ?")) {
+        stats = { total: 0, today: 0, date: todayKey };
+        saveStats();
+        updateStatDisplay();
+      }
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("light");
+      document.body.classList.toggle("dark");
+    }
+  </script>
+</body>
+</html>
